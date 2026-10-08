@@ -1,0 +1,52 @@
+# Core Framework
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+uvloop==0.20.0
+
+# Database
+sqlalchemy[asyncio]==2.0.35
+asyncpg==0.29.0
+alembic==1.13.3
+
+# Settings & Validation
+pydantic==2.9.2
+pydantic-settings==2.5.2
+email-validator==2.2.0
+
+# Auth & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.9
+
+# Analytics Engine
+polars==1.9.0
+numpy==2.1.1
+
+# Telemetry Format Support
+openpyxl==3.1.5          # XLSX ingestion/export
+asammdf==7.4.3            # MDF4/MF4 binary CAN file parsing
+pandas==2.2.3             # Excel bridge (openpyxl integration)
+
+# Report Generation
+reportlab==4.2.2          # PDF sign-off sheet generation
+
+# Async Task Queue
+celery[redis]==5.4.0
+redis==5.1.1
+kombu==5.3.7
+
+# HTTP Client (for object storage communication)
+httpx==0.27.2
+boto3==1.35.30            # AWS S3 / MinIO object storage
+
+# Observability
+prometheus-fastapi-instrumentator==7.0.0
+structlog==24.4.0
+
+# Testing (dev dependencies)
+pytest==8.3.3
+pytest-asyncio==0.24.0
+pytest-cov==5.0.0
+httpx==0.27.2
+factory-boy==3.3.1
+Faker==30.3.0

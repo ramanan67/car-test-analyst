@@ -1,0 +1,155 @@
+version: '3.8'
+
+# ============================================================
+# Automotive Prototype Testing Analytics Platform
+# Multi-Service Docker Compose Topology
+# ============================================================
+
+x-common-env: &common-env
+  DATABASE_URL: postgresql+asyncpg://benz_eng_admin:${DB_PASSWORD:-dev_secure_pass}@database:5432/test_analytics_db
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/0
+  CELERY_RESULT_BACKEND: redis://redis:6379/1
+  STORAGE_BUCKET: ${STORAGE_BUCKET:-prototype-test-telemetry}
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY:-CHANGE_ME_IN_PRODUCTION_USE_256_BIT_KEY}
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+  DEBUG: ${DEBUG:-false}
+
+services:
+
+  # ── PostgreSQL 16 ─────────────────────────────────────────
+  database:
+    image: postgres:16-alpine
+    container_name: test_analytics_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: benz_eng_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dev_secure_pass}
+      POSTGRES_DB: test_analytics_db
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./app/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U benz_eng_admin -d test_analytics_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    shm_size: 256mb
+
+  # ── Redis 7 ───────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: test_analytics_redis
+    restart: always
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --save 60 1
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── FastAPI Application ───────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: test_analytics_api
+    restart: always
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    volumes:
+      - ./:/app:ro  # Read-only source mount (dev only; remove in production)
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.test-analytics.local`)"
+
+  # ── Celery Telemetry Worker ───────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: test_analytics_celery_worker
+    restart: always
+    command: >
+      celery -A app.worker.tasks.celery_app worker
+      --loglevel=info
+      --concurrency=4
+      --queues=telemetry,reports
+      --hostname=worker@%h
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.worker.tasks.celery_app", "inspect", "ping"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+
+  # ── Celery Flower (monitoring) ─────────────────────────────
+  flower:
+    image: mher/flower:2.0
+    container_name: test_analytics_flower
+    restart: always
+    depends_on:
+      - redis
+      - worker
+    command: celery flower --broker=redis://redis:6379/0 --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      FLOWER_BASIC_AUTH: ${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower_secure}
+    profiles:
+      - monitoring
+
+  # ── Nginx Reverse Proxy ────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: test_analytics_nginx
+    restart: always
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_certs:/etc/nginx/certs
+    profiles:
+      - production
+
+# ============================================================
+# Named Volumes
+# ============================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  nginx_certs:
+    driver: local
