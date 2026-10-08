@@ -63,9 +63,9 @@ Obtain a token via `POST /api/v1/auth/login`.
 ### Role Hierarchy
 `VIEWER` < `TECHNICIAN` < `TEST_ANALYST` < `LEAD_ENGINEER` < `ADMIN`
     """,
-    openapi_url="/api/openapi.json",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
+    openapi_url="/openapi.json",
+    docs_url="/docs",
+    redoc_url="/redoc",
     lifespan=lifespan,
 )
 
