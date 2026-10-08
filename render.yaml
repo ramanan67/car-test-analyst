@@ -1,0 +1,77 @@
+services:
+  # FastAPI Application Service
+  - type: web
+    name: automotive-analytics-api
+    runtime: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: automotive-analytics-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: automotive-analytics-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: automotive-analytics-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: redis
+          name: automotive-analytics-redis
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+
+  # Celery Background Worker Service
+  - type: worker
+    name: automotive-analytics-worker
+    runtime: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "celery -A app.worker.tasks.celery_app worker --loglevel=info --concurrency=2 --queues=telemetry,reports"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: automotive-analytics-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: automotive-analytics-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: redis
+          name: automotive-analytics-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: redis
+          name: automotive-analytics-redis
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        fromService:
+          type: web
+          name: automotive-analytics-api
+          envVarKey: JWT_SECRET_KEY
+
+databases:
+  # PostgreSQL 16 Database
+  - name: automotive-analytics-db
+    databaseName: test_analytics_db
+    user: benz_eng_admin
+    plan: free
+
+  # Redis 7 In-Memory Cache & Broker
+  - name: automotive-analytics-redis
+    plan: free
+    ipAllowList: []

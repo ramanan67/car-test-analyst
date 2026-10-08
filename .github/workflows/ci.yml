@@ -1,0 +1,86 @@
+name: CI/CD Pipeline & Deployment Verification
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  test-and-lint:
+    name: Test & Syntax Verification
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: benz_eng_admin
+          POSTGRES_PASSWORD: dev_secure_pass
+          POSTGRES_DB: test_analytics_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: AST Syntax Check
+        run: |
+          python -c "import ast, glob; [ast.parse(open(f, encoding='utf-8').read()) for f in glob.glob('**/*.py', recursive=True)]; print('All python files syntax OK!')"
+
+      - name: Run Unit & Integration Tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://benz_eng_admin:dev_secure_pass@localhost:5432/test_analytics_db
+          REDIS_URL: redis://localhost:6379/0
+          CELERY_BROKER_URL: redis://localhost:6379/0
+          CELERY_RESULT_BACKEND: redis://localhost:6379/1
+          JWT_SECRET_KEY: test_secret_key_ci_cd_32_characters_minimum
+        run: |
+          pytest -v tests/
+
+  build-docker:
+    name: Build & Verify Docker Image
+    needs: test-and-lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: actions/setup-buildx-action@v3
+
+      - name: Build Container Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: automotive-analytics-platform:latest
