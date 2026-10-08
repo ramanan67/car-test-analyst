@@ -47,9 +47,14 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libpq-dev build-essential
+
       - name: Install Dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
 
       - name: AST Syntax Check
@@ -63,6 +68,7 @@ jobs:
           CELERY_BROKER_URL: redis://localhost:6379/0
           CELERY_RESULT_BACKEND: redis://localhost:6379/1
           JWT_SECRET_KEY: test_secret_key_ci_cd_32_characters_minimum
+          PYTHONPATH: "."
         run: |
           pytest -v tests/
 
