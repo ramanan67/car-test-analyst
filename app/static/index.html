@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automotive Prototype Testing Analytics Platform</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --card-bg: #111827;
+      --border-color: #1f2937;
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+    }
+    /* Sidebar */
+    aside {
+      width: 260px;
+      background: #0d1322;
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      padding: 1.5rem 1rem;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .brand svg { width: 28px; height: 28px; fill: var(--accent-cyan); }
+    .brand-title { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.02em; }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 0.35rem;
+      transition: all 0.2s ease;
+    }
+    .nav-item:hover, .nav-item.active {
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--accent-blue);
+    }
+    /* Main Content */
+    main {
+      flex: 1;
+      padding: 2rem 2.5rem;
+      overflow-y: auto;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+    .header-title h1 { font-size: 1.6rem; font-weight: 700; }
+    .header-title p { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.2rem; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--accent-green);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .badge-dot { width: 6px; height: 6px; background: var(--accent-green); border-radius: 50%; }
+    
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+    .stat-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+    .stat-val { font-size: 1.6rem; font-weight: 700; margin: 0.4rem 0 0.2rem; }
+    .stat-meta { font-size: 0.75rem; color: var(--accent-cyan); }
+
+    /* Interactive Section */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.2rem;
+    }
+    .panel-title { font-size: 1.05rem; font-weight: 600; }
+    
+    /* Telemetry Chart */
+    .chart-box { height: 260px; width: 100%; position: relative; }
+
+    /* Telemetry Controls */
+    .btn {
+      background: var(--accent-blue);
+      color: white;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #2563eb; }
+    .btn-secondary { background: #1f2937; color: var(--text-main); }
+    .btn-secondary:hover { background: #374151; }
+
+    /* Evaluation Table */
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th { text-align: left; padding: 0.75rem 1rem; color: var(--text-muted); border-bottom: 1px solid var(--border-color); font-weight: 600; }
+    td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border-color); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+    .status-pill {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.7rem;
+    }
+    .status-pass { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); }
+    .status-fail { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); }
+    .status-marginal { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); }
+
+    .code-box {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.85rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside>
+    <div class="brand">
+      <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+      <div>
+        <div class="brand-title">APTAP</div>
+        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Vehicle Testing</div>
+      </div>
+    </div>
+    <div class="nav-item active">Dashboard</div>
+    <div class="nav-item" onclick="window.open('/docs', '_blank')">REST API Docs (Swagger)</div>
+    <div class="nav-item" onclick="window.open('/redoc', '_blank')">ReDoc API Specs</div>
+    <div class="nav-item" onclick="window.open('https://github.com/ramanan67/car-test-analyst', '_blank')">GitHub Repository</div>
+    <div class="nav-item" onclick="window.open('/health', '_blank')">System Health Probe</div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main>
+    <header>
+      <div class="header-title">
+        <h1>Prototype Testing Analytics Dashboard</h1>
+        <p>Immendingen & Sindelfingen Test Bench Validation Rig</p>
+      </div>
+      <div style="display: flex; gap: 0.75rem; align-items: center;">
+        <span class="badge"><span class="badge-dot"></span> API Engine Online (v1.0.0)</span>
+        <button class="btn" onclick="runSimulatedPull()">Run Dyno Test Pull</button>
+      </div>
+    </header>
+
+    <!-- Stat Highlights -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Active Prototype</div>
+        <div class="stat-val" style="color: #60a5fa;">EQS 580</div>
+        <div class="stat-meta">Proto #42 · AWD 4MATIC</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">0-100 km/h Launch</div>
+        <div class="stat-val" id="stat-accel" style="color: var(--accent-green);">4.32 s</div>
+        <div class="stat-meta">Target: 4.30 s (±0.3s)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Peak Inverter Temp</div>
+        <div class="stat-val" id="stat-temp" style="color: var(--accent-amber);">76.4 °C</div>
+        <div class="stat-meta">Limit: 85.0 °C max</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Engine Throughput</div>
+        <div class="stat-val" style="color: var(--accent-cyan);">1.86M</div>
+        <div class="stat-meta">Samples / Sec (Polars)</div>
+      </div>
+    </div>
+
+    <!-- Charts and Test Configuration -->
+    <div class="dashboard-grid">
+      <!-- Live Synchronised Chart -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Synchronised Telemetry Scrubbing (10 ms High-Speed Stream)</div>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Channels: Speed (km/h) · Torque (Nm) · Temp (°C)</span>
+        </div>
+        <div class="chart-box">
+          <canvas id="telemetryChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Prototype Baseline Specification -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Active Test Baseline</div>
+          <span class="status-pill status-pass">VALIDATED</span>
+        </div>
+        <div style="font-size: 0.85rem; line-height: 1.8;">
+          <div><strong style="color: var(--text-muted);">Vehicle Class:</strong> EQS Sedan (V297)</div>
+          <div><strong style="color: var(--text-muted);">Architecture:</strong> Dual-Motor Electric (BEV)</div>
+          <div><strong style="color: var(--text-muted);">Battery Capacity:</strong> 107.8 kWh</div>
+          <div><strong style="color: var(--text-muted);">Software Build:</strong> SW-26.04-RC2</div>
+          <div><strong style="color: var(--text-muted);">Proving Ground:</strong> Immendingen Oval (DEU)</div>
+          <div><strong style="color: var(--text-muted);">Safety Standard:</strong> ISO 26262 ASIL-D</div>
+        </div>
+        <div class="code-box">SHA-256 Digest: cfb623102c7bf4ca660d7004b6edcd71...</div>
+      </div>
+    </div>
+
+    <!-- Benchmark Evaluation Table -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Engineering Criteria Evaluation Table</div>
+        <a href="/docs" target="_blank" class="btn btn-secondary" style="font-size: 0.75rem; text-decoration: none;">View Endpoints in Swagger</a>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>CRITERIA CODE</th>
+            <th>DESCRIPTION</th>
+            <th>MEASURED VALUE</th>
+            <th>NOMINAL TARGET</th>
+            <th>UPPER / LOWER LIMIT</th>
+            <th>VARIANCE (%)</th>
+            <th>STATUS</th>
+          </tr>
+        </thead>
+        <tbody id="evaluationBody">
+          <tr>
+            <td>ACCEL_0_100_KPH</td>
+            <td>0-100 km/h Launch Time</td>
+            <td id="row-accel-meas">4.32 s</td>
+            <td>4.30 s</td>
+            <td>[3.80 s , 4.60 s]</td>
+            <td id="row-accel-var">+0.47%</td>
+            <td><span class="status-pill status-pass">PASS</span></td>
+          </tr>
+          <tr>
+            <td>MAX_INVERTER_TEMP_C</td>
+            <td>Peak SiC Inverter Temperature</td>
+            <td id="row-temp-meas">76.4 °C</td>
+            <td>75.0 °C</td>
+            <td>[None , 85.0 °C]</td>
+            <td id="row-temp-var">+1.87%</td>
+            <td><span class="status-pill status-pass">PASS</span></td>
+          </tr>
+          <tr>
+            <td>BATTERY_SOC_DRAIN_PCT</td>
+            <td>Dyno Pull SoC Depletion Delta</td>
+            <td>4.2 %</td>
+            <td>4.0 %</td>
+            <td>[None , 6.0 %]</td>
+            <td>+5.00%</td>
+            <td><span class="status-pill status-pass">PASS</span></td>
+          </tr>
+          <tr>
+            <td>PEAK_MOTOR_TORQUE_NM</td>
+            <td>Instantaneous Motor Peak Output</td>
+            <td>855.0 N·m</td>
+            <td>850.0 N·m</td>
+            <td>[800.0 N·m , None]</td>
+            <td>+0.59%</td>
+            <td><span class="status-pill status-pass">PASS</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script>
+    // Initialize Chart.js Telemetry Graph
+    const ctx = document.getElementById('telemetryChart').getContext('2d');
+    const timeLabels = Array.from({length: 30}, (_, i) => (i * 0.2).toFixed(1) + 's');
+    
+    // Generate initial realistic curve
+    const speedData = timeLabels.map((_, i) => Math.min(105, Math.pow(i / 22, 1.8) * 105));
+    const torqueData = timeLabels.map((_, i) => Math.max(200, 855 - i * 18));
+    const tempData = timeLabels.map((_, i) => 35 + Math.pow(i / 29, 1.4) * 41.4);
+
+    const telemetryChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: timeLabels,
+        datasets: [
+          {
+            label: 'Speed (km/h)',
+            data: speedData,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            yAxisID: 'y',
+            tension: 0.3,
+            fill: true
+          },
+          {
+            label: 'Inverter Temp (°C)',
+            data: tempData,
+            borderColor: '#f59e0b',
+            borderDash: [5, 5],
+            yAxisID: 'y1',
+            tension: 0.3
+          },
+          {
+            label: 'Motor Torque (N·m)',
+            data: torqueData,
+            borderColor: '#10b981',
+            yAxisID: 'y2',
+            tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#9ca3af', font: { family: 'Inter', size: 11 } } }
+        },
+        scales: {
+          x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af' } },
+          y: {
+            position: 'left',
+            grid: { color: '#1f2937' },
+            ticks: { color: '#3b82f6' },
+            title: { display: true, text: 'km/h', color: '#3b82f6' }
+          },
+          y1: {
+            position: 'right',
+            grid: { drawOnChartArea: false },
+            ticks: { color: '#f59e0b' },
+            title: { display: true, text: '°C', color: '#f59e0b' }
+          },
+          y2: {
+            position: 'right',
+            grid: { drawOnChartArea: false },
+            ticks: { color: '#10b981' },
+            title: { display: true, text: 'N·m', color: '#10b981' }
+          }
+        }
+      }
+    });
+
+    // Run simulated new dyno pull with real-time UI reaction
+    function runSimulatedPull() {
+      const launch = (4.1 + Math.random() * 0.4).toFixed(2);
+      const temp = (73 + Math.random() * 6).toFixed(1);
+      
+      document.getElementById('stat-accel').innerText = launch + ' s';
+      document.getElementById('stat-temp').innerText = temp + ' °C';
+      
+      document.getElementById('row-accel-meas').innerText = launch + ' s';
+      const accelVar = (((launch - 4.30) / 4.30) * 100).toFixed(2);
+      document.getElementById('row-accel-var').innerText = (accelVar > 0 ? '+' : '') + accelVar + '%';
+
+      document.getElementById('row-temp-meas').innerText = temp + ' °C';
+      const tempVar = (((temp - 75.0) / 75.0) * 100).toFixed(2);
+      document.getElementById('row-temp-var').innerText = (tempVar > 0 ? '+' : '') + tempVar + '%';
+
+      // Perturb chart
+      telemetryChart.data.datasets[0].data = timeLabels.map((_, i) => Math.min(105, Math.pow(i / (launch * 5), 1.8) * 105));
+      telemetryChart.update();
+    }
+  </script>
+</body>
+</html>

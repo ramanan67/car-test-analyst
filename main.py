@@ -144,3 +144,20 @@ app.include_router(vehicles.router, prefix=API_PREFIX)
 app.include_router(criteria.router, prefix=API_PREFIX)
 app.include_router(test_runs.router, prefix=API_PREFIX)
 app.include_router(analytics.router, prefix=API_PREFIX)
+
+# ---------------------------------------------------------------------------
+# Frontend Web Dashboard (Module D)
+# ---------------------------------------------------------------------------
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+STATIC_DIR = Path(__file__).resolve().parent / "app" / "static"
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+    @app.get("/", tags=["Dashboard"], include_in_schema=False)
+    async def serve_dashboard():
+        """Serves the interactive web analytics frontend dashboard."""
+        index_file = STATIC_DIR / "index.html"
+        return FileResponse(str(index_file))
